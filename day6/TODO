@@ -1,0 +1,3 @@
+Optimize part2:
+* Avoid cloning vectors
+* Use multithreading
