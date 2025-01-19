@@ -1,0 +1,78 @@
+#[derive(Debug)]
+struct MemoryBlocks {
+    size: u32,
+    file_idx: Option<u32>
+}
+
+impl MemoryBlocks {
+    fn new(size: u32, file_idx: Option<u32>) -> Self
+    {
+        Self {size, file_idx}
+    }
+
+    fn is_empty_space(&self) -> bool {
+        self.file_idx.is_none()
+    }
+
+    fn is_file(&self) -> bool {
+        self.file_idx.is_some()
+    }
+
+    fn is_drained_or_empty(&self) -> bool {
+        self.file_idx.is_none() || size == 0
+    }
+
+    fn take_up_to_n_blocks(&mut self, mut blocks: u32) -> Self
+    {
+        if self.size < blocks {
+            blocks = self.size;
+        }
+
+        self.size -= blocks;
+
+        MemoryBlocks { size: blocks, file_idx: self.file_idx }
+    }
+}
+
+pub fn part1(input: &str) -> usize
+{
+    let mut empty_space = true;
+    let mut file_idx = 0;
+
+    let disk_map = input.chars()
+        .enumerate()
+        .map(|(idx, size)|
+        {
+            empty_space = !empty_space;
+            file_idx += if empty_space { 1 } else { 0 };
+            MemoryBlocks::new
+            (
+                size.to_digit(10).unwrap_or_else( || panic!("Invalid digit `{size}` at {idx}")),
+                if !empty_space { Some(file_idx) } else { None }
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let l_idx = 0;
+
+
+    println!("{disk_map:?}");
+
+    //loop
+    //{
+    //    match (characters.next(), characters.next())
+    //    {
+    //        (Some(c1), Some(c2)) => println!("{c1}{c2}"),
+    //        (Some(c1), _)              => println!("{c1}"),
+    //        _                                => break
+    //    }
+    //}
+
+
+    0
+}
+
+//pub fn part2(input: &str) -> usize
+//{
+//    0
+//}
