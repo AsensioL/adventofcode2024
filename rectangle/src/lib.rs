@@ -90,6 +90,12 @@ impl Rectangle<char> {
         // Return
         Rectangle::from_vec(data)
     }
+
+    pub fn to_string(&self) -> String {
+        self.data.iter()
+            .flat_map(|row| row.iter().chain(Some('\n').iter()) )
+            .collect::<String>()
+    }
 }
 
 
@@ -161,6 +167,30 @@ impl RectangleEdge {
     }
 }
 
+// ------------ Direction enum ------------
+#[derive(Debug, Eq, Hash, PartialEq, Copy, Clone)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right
+}
+
+impl Direction {
+    pub fn is_horizontal(&self) -> bool {
+        match self {
+            Direction::Up   |  Direction::Down => false,
+            Direction::Left |  Direction::Right  => true,
+        }
+    }
+
+    pub fn is_vertical(&self) -> bool {
+        match self {
+            Direction::Up   |  Direction::Down => true,
+            Direction::Left |  Direction::Right  => false,
+        }
+    }
+}
 
 // ------------ Iterator helper ------------
 pub struct RectangularCoordIterator {
@@ -200,8 +230,14 @@ impl Iterator for RectangularCoordIterator {
 
 // ------------ Rectangular Trait ------------
 pub trait Rectangular {
+    // Required
     fn get_width(&self) -> usize;
     fn get_height(&self) -> usize;
+
+    // Provided
+    fn contains(&self, coord: &(usize, usize)) -> bool {
+        (0..self.get_height()).contains(&coord.0) && (0..self.get_width()).contains(&coord.1)
+    }
 
     fn iter_coord(&self) -> RectangularCoordIterator {
         // Return an iterator over the coordinates of the rectangle
@@ -242,6 +278,16 @@ pub trait Rectangular {
             RectangleEdge::Right(  *coord)
         ]
     }
+
+    fn next_coord(&self, pos: &(usize, usize), dir: Direction) -> Option<(usize, usize)> {
+        let adjacent = self.adjacent_coordinates(pos);
+        match dir {
+            Direction::Up    => adjacent[0],
+            Direction::Down  => adjacent[1],
+            Direction::Left  => adjacent[2],
+            Direction::Right => adjacent[3],
+        }
+    }
 }
 
 impl<T> Rectangular for Rectangle<T> {
@@ -249,10 +295,33 @@ impl<T> Rectangular for Rectangle<T> {
     fn get_height(&self) -> usize { self.height }
 }
 
+// ------------ RectangularError class ------------
+#[derive(PartialEq, Debug)]
+pub enum RectangularError {
+    CoordinatesOutOfBounds(usize, usize),
+}
 
+impl fmt::Display for RectangularError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CoordinatesOutOfBounds(row,col) => write!(f, "Coordinates out of bounds: row {row}, column {col}."),
+        }
+    }
+}
+impl Error for RectangularError {}
+type RectangularResult = Result<(), RectangularError>;
 // ------------ RectangularData Trait ------------
-pub trait RectangularData<T: std::cmp::PartialEq> {
-    fn get(&self, coord: (usize, usize)) -> Option<&T>;
+pub trait RectangularData<T: std::cmp::PartialEq + Copy + Clone>: Rectangular {
+    fn get(&self, coord: &(usize, usize)) -> Result<&T, RectangularError>;
+    fn set(&mut self, coord: &(usize, usize), new_value: &T) -> RectangularResult;
+
+    fn swap(&mut self, one: &(usize, usize), two: &(usize, usize)) -> Result<(), RectangularError> {
+        let value_of_one = *self.get(one)?;
+        let value_of_two = *self.get(two)?;
+        self.set(one, &value_of_two)?;
+        self.set(two, &value_of_one)?;
+        Ok( () )
+    }
 
     fn adjacent_coordinates_matching(&self, coord: &(usize, usize), compare: &T) -> [Option<(usize, usize)>; 4]
     where Self: Rectangular
@@ -263,7 +332,7 @@ pub trait RectangularData<T: std::cmp::PartialEq> {
             .for_each( |ma|
             {
                 if let Some(c) = ma {
-                    if self.get(*c).unwrap() != compare {
+                    if self.get(c).unwrap() != compare {
                         *ma = None;
                     }
                 }
@@ -273,9 +342,21 @@ pub trait RectangularData<T: std::cmp::PartialEq> {
     }
 }
 
-impl<T: PartialEq> RectangularData<T> for Rectangle<T> {
-    fn get(&self, coord: (usize, usize)) -> Option<&T> {
-        self.data.get(coord.0).and_then(|row| row.get(coord.1) )
+impl<T: PartialEq + Copy> RectangularData<T> for Rectangle<T> {
+    fn get(&self, coord: &(usize, usize)) -> Result<&T, RectangularError> {
+        self.data.get(coord.0)
+            .and_then(|row| row.get(coord.1) )
+            .ok_or(RectangularError::CoordinatesOutOfBounds(coord.0, coord.1))
+    }
+
+    fn set(&mut self, coord: &(usize, usize), new_value: &T) -> RectangularResult {
+        self.data.get_mut(coord.0)
+            .and_then(|row|
+            {
+                row.get_mut(coord.1)
+                    .map(|value| *value = *new_value )
+            })
+            .ok_or(RectangularError::CoordinatesOutOfBounds(coord.0, coord.1))
     }
 }
 
