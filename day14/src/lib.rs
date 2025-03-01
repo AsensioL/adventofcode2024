@@ -47,8 +47,8 @@ pub fn part2(input: &str, width: i32, height: i32) -> i32
         )
         .collect::<Vec<_>>();
 
-    // For each number of iterations...
-    (0..10000)
+    // For each number of iterations between 0 and 10k
+    let iterations_for_image = (0..10000)
         .map(|iterations| {
             // Calculate the positions of all robots and put them into a HashSet
             let positions = parsed_data.iter()
@@ -70,7 +70,11 @@ pub fn part2(input: &str, width: i32, height: i32) -> i32
         // Find item with most neighbors, and return how many iterations it took to get there
         .max_by_key(|(_, neighbors)| *neighbors )
         .map(|(iterations, _)| iterations ) //
-        .unwrap()
+        .unwrap();
+
+    print_robots(parsed_data, width, height, iterations_for_image);
+
+    iterations_for_image
 }
 
 fn neighbor_coords(coord: &(i32, i32)) -> [(i32, i32); 8] {
@@ -85,4 +89,25 @@ fn neighbor_coords(coord: &(i32, i32)) -> [(i32, i32); 8] {
         ((*x - 1), (*y + 1)),
         ((*x    ), (*y + 1)),
     ]
+}
+
+fn print_robots(robot_data: Vec<(i32, i32, i32, i32)>, width: i32, height:i32, iterations: i32) {
+    // Calculate the positions the
+    let image_positions = robot_data.iter()
+    .map(|(x,y, vx, vy)| {
+        ((((x + iterations * vx) %  width) +  width) %  width,
+        (((y + iterations * vy) % height) + height) % height)
+    })
+    .collect::<HashSet<(i32, i32)>>();
+
+    let mut output = String::new();
+
+    for y in 0..height {
+        for x in 0..width {
+            output += if image_positions.contains( &(x, y) ) { "#" } else { " " };
+        }
+        output += "\n";
+    }
+
+    println!("{output}");
 }
