@@ -19,7 +19,7 @@ pub fn part1(input: &str) -> usize
         }
 
         // Take first char and build a FILO
-        let c = *r.get(init_coord).unwrap();
+        let c = *r.get(&init_coord).unwrap();
         let mut filo = vec!{init_coord};
         let mut current_group = HashSet::new();
 
@@ -50,7 +50,7 @@ pub fn part1(input: &str) -> usize
                 let adjacent_cells = r.adjacent_coordinates(coord).into_iter().flatten().collect::<Vec<_>>();
                 let beyond_limit_cells = 4 - adjacent_cells.len();
                 let other_cells = adjacent_cells.into_iter()
-                    .filter(|coord| *r.get(*coord).unwrap() != c )
+                    .filter(|coord| *r.get(coord).unwrap() != c )
                     .count();
                 beyond_limit_cells + other_cells
             })
@@ -79,7 +79,7 @@ pub fn part2(input: &str) -> usize
         }
 
         // Take first char and build a FILO
-        let c = *r.get(init_coord).unwrap();
+        let c = *r.get(&init_coord).unwrap();
         let mut filo = vec!{init_coord};
         let mut current_group = HashSet::new();
 
@@ -112,7 +112,7 @@ pub fn part2(input: &str) -> usize
                 };
 
                 // If the adjacent cell value is different from this one, then it is an edge. Otherwise, it isn't.
-                if r.get(coord).unwrap() != &c {
+                if r.get(&coord).unwrap() != &c {
                     Some(edge)
                 }
                 else {
