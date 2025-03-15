@@ -190,6 +190,15 @@ impl Direction {
             Direction::Left |  Direction::Right  => false,
         }
     }
+
+    pub fn reverse(&self) -> Direction {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right  => Direction::Left,
+        }
+    }
 }
 
 // ------------ Iterator helper ------------
