@@ -96,6 +96,22 @@ impl Rectangle<char> {
             .flat_map(|row| row.iter().chain(Some('\n').iter()) )
             .collect::<String>()
     }
+
+    /// Same as to_string but can modify each individual character via closure
+    /// that takes the cell coordinates and the current character
+    pub fn to_string_with_changes<F>(&self, f: F) -> String
+    where F: Fn((usize, usize), char) -> char + Copy + Clone
+    {
+        self.data.iter()
+            .enumerate()
+            .flat_map(|(row_idx, row)|
+                row.iter()
+                    .enumerate()
+                    .map(move |(col_idx, c)| f((row_idx, col_idx), *c) )
+                    .chain(Some('\n').into_iter())
+                )
+            .collect::<String>()
+    }
 }
 
 
