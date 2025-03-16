@@ -1,0 +1,14 @@
+[package]
+name = "day16"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rectangle = { version = "0.1.0", path = "../rectangle" }
+
+
+
+[profile.release]
+debug=1
+
+
