@@ -1,5 +1,6 @@
 use std::fmt;
 use std::error::Error;
+use std::marker::PhantomData;
 
 
 // ------------ RectangleError class ------------
@@ -49,6 +50,11 @@ impl<T> Rectangle<T> {
         };
 
         Ok( Rectangle::<T> {data, height, width} )
+    }
+
+    pub fn from_repeated_element(elem: T, height: usize, width: usize) -> Self
+    where T: std::clone::Clone{
+        Rectangle {data: vec![vec![elem; width]; height], height, width}
     }
 
     pub fn from_num_str(text: &str) -> RectangleResult<T>
@@ -108,7 +114,7 @@ impl Rectangle<char> {
                 row.iter()
                     .enumerate()
                     .map(move |(col_idx, c)| f((row_idx, col_idx), *c) )
-                    .chain(Some('\n').into_iter())
+                    .chain(Some('\n'))
                 )
             .collect::<String>()
     }
@@ -227,7 +233,7 @@ pub struct RectangularCoordIterator {
 
 impl RectangularCoordIterator {
     fn new(width: usize, height: usize) -> Self {
-        RectangularCoordIterator {width, height, curr_col: 0, curr_row: 0}
+        Self {width, height, curr_col: 0, curr_row: 0}
     }
 }
 
@@ -335,6 +341,54 @@ impl fmt::Display for RectangularError {
 }
 impl Error for RectangularError {}
 type RectangularResult = Result<(), RectangularError>;
+
+// ------------ RectangularData Iterator helper ----------
+pub struct RectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    width: usize,
+    height: usize,
+    curr_col: usize,
+    curr_row: usize,
+    rectangular_data: &'a R,
+    phantom: PhantomData<T>
+}
+
+impl<'a, R, T> RectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    fn new(width: usize, height: usize, rectangular_data: &'a R) -> Self {
+        Self {width, height, curr_col: 0, curr_row: 0, rectangular_data, phantom: PhantomData}
+    }
+}
+
+impl<'a, R, T> Iterator for RectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    type Item = ((usize, usize), &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Increase col
+        let current = (self.curr_row, self.curr_col);
+        let result = self.rectangular_data.get(&current).ok().map(|c| (current, c));
+        let curr_row = self.curr_row;
+
+        self.curr_col += 1;
+        if self.curr_col >= self.width {
+            self.curr_row += 1;
+            self.curr_col = 0;
+        }
+        if curr_row >= self.height {
+            return None;
+        }
+        result
+    }
+}
+
+
 // ------------ RectangularData Trait ------------
 pub trait RectangularData<T: std::cmp::PartialEq + Copy + Clone>: Rectangular {
     fn get(&self, coord: &(usize, usize)) -> Result<&T, RectangularError>;
@@ -364,6 +418,10 @@ pub trait RectangularData<T: std::cmp::PartialEq + Copy + Clone>: Rectangular {
             });
 
         adjacent_cells
+    }
+
+    fn iter_coord_and_data(&self) -> RectangularDataIterator<Self, T> {
+        RectangularDataIterator::new(self.get_width(), self.get_height(), self)
     }
 }
 
