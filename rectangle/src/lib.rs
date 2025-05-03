@@ -1,3 +1,4 @@
+use std::cmp;
 use std::fmt;
 use std::error::Error;
 use std::marker::PhantomData;
@@ -388,6 +389,58 @@ where R: RectangularData<T> + ?Sized,
     }
 }
 
+// ------------ SubRectangularData Iterator helper ----------
+pub struct SubRectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    // start_row: usize,
+    start_col: usize,
+    one_past_last_row: usize,
+    one_past_last_col: usize,
+    curr_row: usize,
+    curr_col: usize,
+    rectangular_data: &'a R,
+    phantom: PhantomData<T>
+}
+
+impl<'a, R, T> SubRectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    fn new(start_coord: &(usize, usize), one_past_last_coord: &(usize, usize), rectangular_data: &'a R) -> Self {
+        Self {start_col: start_coord.1,
+              one_past_last_row: one_past_last_coord.0,
+              one_past_last_col: one_past_last_coord.1,
+              curr_row: start_coord.0,
+              curr_col: start_coord.1,
+              rectangular_data, phantom: PhantomData}
+    }
+}
+
+impl<'a, R, T> Iterator for SubRectangularDataIterator<'a, R, T>
+where R: RectangularData<T> + ?Sized,
+      T: std::cmp::PartialEq + Copy + Clone + 'a
+{
+    type Item = ((usize, usize), &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Increase col
+        let current = (self.curr_row, self.curr_col);
+        let result = self.rectangular_data.get(&current).ok().map(|c| (current, c));
+        let curr_row = self.curr_row;
+
+        self.curr_col += 1;
+        if self.curr_col >= self.one_past_last_col {
+            self.curr_row += 1;
+            self.curr_col = self.start_col;
+        }
+        if curr_row >= self.one_past_last_row {
+            return None;
+        }
+        result
+    }
+}
 
 // ------------ RectangularData Trait ------------
 pub trait RectangularData<T: std::cmp::PartialEq + Copy + Clone>: Rectangular {
@@ -420,8 +473,28 @@ pub trait RectangularData<T: std::cmp::PartialEq + Copy + Clone>: Rectangular {
         adjacent_cells
     }
 
+    /// Return an iterator that provides a tuple containing both of the following:
+    /// 1. the coordinate (row, col), and
+    /// 2. a reference to the character
     fn iter_coord_and_data(&self) -> RectangularDataIterator<Self, T> {
         RectangularDataIterator::new(self.get_width(), self.get_height(), self)
+    }
+
+    /// Return an iterator that provides a tuple containing both of the following:
+    /// 1. the coordinate (row, col), and
+    /// 2. a reference to the character
+    ///
+    /// The coordinates and data provided are centered around the passed coordinate (C)
+    /// and reach a distance (D) in all directions, so the returned elements are in the
+    /// rectangle given by \[(C-D, C-D), (C+D+1, C+D+1)\] but are clipped to not exceed
+    /// the size of the rectangle in any direction.
+    fn iter_coord_and_data_around_coord(&self, coord: &(usize, usize), distance: usize) -> SubRectangularDataIterator<Self, T> {
+        let start_row = coord.0 - cmp::min(coord.0, distance);
+        let start_col = coord.1 - cmp::min(coord.1, distance);
+        let one_past_end_row = cmp::min(coord.0 + distance + 1, self.get_height());
+        let one_past_end_col = cmp::min(coord.1 + distance + 1, self.get_width());
+
+        SubRectangularDataIterator::new(&(start_row, start_col), &(one_past_end_row, one_past_end_col), self)
     }
 }
 
@@ -611,6 +684,74 @@ ghi";
         assert_eq!(
             rectangle.adjacent_coordinates_matching(&(1, 2), &1),
             [ Some( (0, 2) ), Some( (2, 2)), Some( (1, 1)), None ]
+        );
+    }
+
+    #[test]
+    fn test_iter_coord_and_data_around_coord() {
+        let input = "00000
+01230
+04560
+07890
+00000";
+
+        let rectangle: Rectangle<u32> = Rectangle::from_num_str(input).unwrap();
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(0, 0), 1)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![0,0, 0,1]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(2, 2), 1)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![1,2,3, 4,5,6, 7,8,9]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(2, 2), 1)
+                .map( |(c, _)| c )
+                .collect::<Vec<_>>(),
+            vec![(1,1),(1,2),(1,3),
+                 (2,1),(2,2),(2,3),
+                 (3,1),(3,2),(3,3)]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(3, 3), 1)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![5,6,0, 8,9,0, 0,0,0]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(4, 4), 1)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![9,0, 0,0]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(1, 3), 1)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![0,0,0, 2,3,0, 5,6,0]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(1, 3), 2)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![0,0,0,0, 1,2,3,0, 4,5,6,0, 7,8,9,0]
+        );
+
+        assert_eq!(
+            rectangle.iter_coord_and_data_around_coord(&(3, 1), 0)
+                .map( |(_, n)| *n )
+                .collect::<Vec<_>>(),
+            vec![7]
         );
     }
 }
